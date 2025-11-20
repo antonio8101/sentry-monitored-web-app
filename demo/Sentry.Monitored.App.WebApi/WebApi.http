@@ -1,0 +1,16 @@
+@WebApplication1_HostAddress = http://localhost:5292
+
+GET {{WebApplication1_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+GET {{WebApplication1_HostAddress}}/checksentry/
+Accept: application/json
+
+###
+GET {{WebApplication1_HostAddress}}/checksentryWithException/
+Accept: application/json
+
+###
+GET {{WebApplication1_HostAddress}}/checksentryWithLogging/
+Accept: application/json
