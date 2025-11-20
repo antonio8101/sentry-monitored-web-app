@@ -246,11 +246,10 @@ presentazione/
 ```
 Example commands:
 ```powershell
-cd presentazione
-npm init -y
-npm install @slidev/cli @slidev/theme-default
-npx slidev slides.md
+pnpm install
+pnpm dev
 ```
+visit <http://localhost:3030>
 
 ## Useful Links
 - Homepage: https://sentry.io/
