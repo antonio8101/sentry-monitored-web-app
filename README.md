@@ -1,87 +1,91 @@
 # Sentry .NET
 
-Proof of Concept (POC) per mostrare come integrare Sentry in una Web API .NET e fornire una piccola demo + materiale di presentazione.
+Proof of Concept (POC) to show how to integrate Sentry into a .NET Web API and provide a small demo + presentation material.
 
-## Mappa del repository
+## Repository Map
 
+```text
+sentry-monitored-web-app/
+├── README.md
+├── demo/
+│   ├── Sentry.Monitored.App.sln
+│   ├── Sentry.Monitored.App.WebApi/
+│   │   ├── Program.cs
+│   │   ├── appsettings.json
+│   │   ├── appsettings.Development.json (if present)
+│   │   ├── Properties/
+│   │   │   └── launchSettings.json
+│   │   ├── Sentry.Monitored.App.WebApi.csproj
+│   │   ├── WebApi.http (for manual testing)
+│   │   ├── bin/ (build output)
+│   │   └── obj/ (build artifacts)
+└── presentation/ (Slidev presentation)
+    ├── slides.md
+    └── package.json
 ```
-Sentry.Monitored.App.sln
-README.md (questo file)
-Sentry.Monitored.App.WebApi/
-  Program.cs
-  appsettings.json
-  appsettings.Development.json
-  Properties/launchSettings.json
-  Sentry.Monitored.App.WebApi.csproj
-  WebApi.http (richieste di esempio)
-  bin/ ... (output compilazione)
-  obj/ ... (artefatti di build)
-demo/ (piccola demo di utilizzo / esempi aggiuntivi)
-presentazione/ (slide Slidev sulla POC e su Sentry)  <-- se non presente, da creare
-```
-Se alcune cartelle (es. `presentazione/`) non sono ancora presenti, crearle manualmente.
+If optional folders (e.g. `presentazione/`) are missing you can create them as needed.
 
-## Cos'è Sentry
+## What is Sentry
 
-[Sentry](https://sentry.io/) è una piattaforma di Application Monitoring che permette di:
-- Tracciare errori (Issue Tracking) con stack trace dettagliati
-- Rilevare performance (transaction tracing, Apdex, breakdown per span)
-- Collegare release e distribuzioni per capire quando è stato introdotto un problema
-- Aggiungere contesto (utente, tag, extra, breadcrumbs) per facilitare la diagnosi
+[Sentry](https://sentry.io/) is an Application Monitoring platform that lets you:
+- Track errors (Issue Tracking) with detailed stack traces
+- Detect performance issues (transaction tracing, Apdex, span breakdown)
+- Link releases and deployments to understand when a problem was introduced
+- Add context (user, tags, extras, breadcrumbs) to ease diagnosis
 
-Documentazione .NET: https://docs.sentry.io/platforms/dotnet/
+.NET docs: https://docs.sentry.io/platforms/dotnet/
 
-## Obiettivi della POC
-1. Configurare un nuovo progetto Sentry lato piattaforma
-2. Integrare il SDK .NET in una Web API
-3. Inviare errori e transazioni di performance
-4. Mostrare una demo di generazione errore e tracing
-5. Materiale slide per spiegare il flusso
+## POC Objectives
+1. Configure a new Sentry project on the platform
+2. Integrate the .NET SDK into a Web API
+3. Send errors and performance transactions
+4. Show a demo generating an error and tracing
+5. Provide slides explaining the overall flow
 
-## Prerequisiti
-- .NET SDK (versione >= 8/9/10 a seconda del progetto — il csproj indica `net10.0`)
-- Account Sentry (gratuito o trial)
-- Accesso alla rete per inviare gli eventi (porta 443 HTTPS)
+## Prerequisites
+- .NET SDK (version >= 8/9/10 — the csproj targets `net10.0`)
+- Sentry account (free or trial)
+- Network access (HTTPS port 443) to send events
 
-## Passaggi sulla piattaforma Sentry
-1. Registrati / Accedi a https://sentry.io/
-2. Crea un'Organizzazione (se non esiste) o usa quella esistente
-3. Vai su Projects > Create Project
-4. Seleziona piattaforma: .NET (ASP.NET Core)
-5. Dai un nome al progetto (es: `sentry-monitored-web-api`)
-6. Annota la DSN generata (formato: `https://<key>@o<org>.ingest.sentry.io/<projectId>`) — NON committare chiavi sensibili in chiaro se il repo è pubblico
-7. (Opzionale) Configura:
-   - Environments (es: `Development`, `Staging`, `Production`)
+## Steps on the Sentry Platform
+1. Register / Log in at https://sentry.io/
+2. Create or use an existing Organization
+3. Go to Projects > Create Project
+4. Select platform: .NET (ASP.NET Core)
+5. Name the project (e.g. `sentry-monitored-web-api`)
+6. Note the DSN generated (format: `https://<key>@o<org>.ingest.sentry.io/<projectId>`) — DO NOT commit sensitive keys if the repo is public
+7. (Optional) Configure:
+   - Environments (`Development`, `Staging`, `Production`)
    - Alert Rules (error rate, regression, performance)
-   - Performance (abilitato di default nei piani compatibili)
-   - Sample Rate per tracing (consigliato iniziare con 1.0 in dev e ridurre in prod)
-8. (Opzionale) Imposta un Release naming convention (es: `sentry-monitored-web-api@1.0.0+build123`)
-9. Verifica nel Project Settings > Client Keys che la DSN sia attiva
+   - Performance (enabled by default in eligible plans)
+   - Sample Rate for tracing (start with 1.0 in dev; reduce in production)
+8. (Optional) Set a Release naming convention (e.g. `sentry-monitored-web-api@1.0.0+build123`)
+9. Verify in Project Settings > Client Keys that the DSN is active
 
-## Passaggi nell'applicazione Web API .NET
-### 1. Aggiunta pacchetto
-Nel file csproj o via CLI:
+## Steps in the .NET Web API Application
+### 1. Add package
+In the csproj or via CLI (note path inside `demo/`):
 ```
-dotnet add Sentry.Monitored.App.WebApi package Sentry.AspNetCore
+dotnet add demo/Sentry.Monitored.App.WebApi package Sentry.AspNetCore
 ```
-(Se serve tracing avanzato aggiunge automaticamente le dipendenze necessarie.)
+(Advanced tracing dependencies are added automatically.)
 
-### 2. Configurazione di base in `Program.cs`
-Inserisci prima del `builder.Build()`:
+### 2. Basic configuration in `Program.cs`
+Insert before `builder.Build()`:
 ```csharp
 builder.WebHost.UseSentry(options =>
 {
-    options.Dsn = builder.Configuration["Sentry:Dsn"]; // Legge da appsettings o segreti utente
-    options.Debug = true;            // Solo in Development
-    options.TracesSampleRate = 1.0;  // 100% in Dev; riduci es. 0.2 in Production
+    options.Dsn = builder.Configuration["Sentry:Dsn"]; // Reads from appsettings or user secrets
+    options.Debug = true;            // Development only
+    options.TracesSampleRate = 1.0;  // 100% in Dev; reduce e.g. 0.2 in Production
     options.Environment = builder.Environment.EnvironmentName; // Development/Production
-    // options.Release = "sentry-monitored-web-api@1.0.0"; // Imposta se gestisci versioning
+    // options.Release = "sentry-monitored-web-api@1.0.0"; // Set if you manage versioning
 });
 
-builder.Services.AddSentry(); // Registra integrazione per DI, logging, ecc.
+builder.Services.AddSentry(); // Registers integration for DI, logging, etc.
 ```
 
-### 3. Configurazione in `appsettings.json`
+### 3. Configuration in `appsettings.json`
 ```json
 {
   "Sentry": {
@@ -91,29 +95,28 @@ builder.Services.AddSentry(); // Registra integrazione per DI, logging, ecc.
   }
 }
 ```
-In ambienti protetti usa Secret Manager (`dotnet user-secrets`) o variabili d'ambiente per la DSN.
+In protected environments use Secret Manager (`dotnet user-secrets`) or environment variables for the DSN.
 
-### 4. Cattura errori manuale
-
-La cattura degli errori avviene automaticamente, tutte le eccezioni sono inviate a Sentry, ma puoi anche farlo manualmente.
-In una Web API le eccezioni non gestite sono già intercettate dal middleware Sentry.
+### 4. Manual error capture
+Error capture happens automatically; all unhandled exceptions are sent to Sentry. You can also do it manually.
+In a Web API unhandled exceptions are already captured by the Sentry middleware.
 
 ```csharp
 using Sentry;
 
 try
 {
-    // codice che genera eccezione
-    throw new InvalidOperationException("Errore di test POC");
+    // Code that throws
+    throw new InvalidOperationException("Test POC error");
 }
 catch (Exception ex)
 {
-    SentrySdk.CaptureException(ex); // Invia a Sentry
+    SentrySdk.CaptureException(ex); // Sends to Sentry
 }
 ```
 
-### 5. Aggiunta di contesto
-Con Sentry puoi aggiungere informazioni utili per la diagnosi creando un contesto nello scope corrente:
+### 5. Adding context
+With Sentry you can add helpful diagnostic info by creating context in the current scope:
 ```csharp
 SentrySdk.ConfigureScope(scope =>
 {
@@ -122,8 +125,7 @@ SentrySdk.ConfigureScope(scope =>
     scope.SetExtra("payload_size", 1234);
 });
 ```
-Queste dati vengono inviate con ogni evento, di logging successivo alla configurazione.
-La collocazione ideale per questi settaggi è in un middleware custom o in un filtro action.
+These values are sent with every event/log captured after the configuration. The ideal place for these settings is in custom middleware or an action filter.
 
 ```csharp
 public sealed class SentryRequestContextMiddleware
@@ -202,46 +204,47 @@ public sealed class SentryRequestContextMiddleware
 ```
 
 ### 6. Performance (tracing)
-Transazioni e span vengono creati automaticamente (ASP.NET Core pipeline, HTTP client). Per span custom:
+Transactions and spans are created automatically (ASP.NET Core pipeline, HTTP client). For custom spans:
 ```csharp
 var transaction = SentrySdk.StartTransaction("demo-request", "webapi.request");
-var span = transaction.StartChild("custom.work", "Elaborazione business logic");
-// ... codice
+var span = transaction.StartChild("custom.work", "Business logic processing");
+// ... code
 span.Finish();
 transaction.Finish();
 ```
-In un controller spesso non è necessario: il middleware genera transazioni per ogni request, e grazie a questo fornisce una tempistica di risposta per ogni richiesta (automaticamente).
-Queste impostazioni servono ad effettuare una sampling aggiuntiva.
+In a controller this is often not necessary: the middleware creates a transaction per request, giving response timing automatically. These settings let you do additional sampling.
 
 ### 7. Logging integration
-Se usi `ILogger`, i log con livello Error+ vengono inviati come breadcrumbs / eventi.
-Configurabile tramite `AddSentry()`.
+If you use `ILogger`, logs with level Error+ are sent as breadcrumbs / events. Configurable via `AddSentry()`.
 
-### 8. Release e Deploy
-Per collegare issues ad una release:
+### 8. Release & Deploy
+To associate issues to a release:
 ```csharp
 options.Release = "sentry-monitored-web-api@1.0.0";
 ```
-Puoi inviare anche info deploy via CLI (facoltativo): questo aiuta a tracciare quando un issue è stato introdotto, quale commit.
+You can also send deploy info via CLI (optional): helps track when an issue was introduced and which commit.
 
-
-### 9. Simulare errori e verificare
-Avvia l'app (`dotnet run --project Sentry.Monitored.App.WebApi`) e chiama un endpoint che genera un'eccezione. Entro pochi secondi dovresti vedere l'issue nel pannello Sentry.
+### 9. Simulate errors and verify
+Run the app:
+```
+dotnet run --project demo/Sentry.Monitored.App.WebApi
+```
+Call an endpoint that throws an exception. Within a few seconds you should see the issue in Sentry.
 
 ## Demo
-La cartella `demo/` può contenere:
-- Script/endpoint per generare errori e transazioni
-- File `.http` (`WebApi.http`) già presente per testare richieste
-- Eventuali snippet per confronto prima/dopo
+The `demo/` folder contains the solution and project. You can add:
+- Scripts/endpoints to generate errors and transactions
+- The `.http` file (`WebApi.http`) already present for manual request testing
+- Snippets to compare before/after
 
-## Presentazione (Slidev)
-Creare directory `presentazione/` con contenuto Slidev:
+## Presentation (Slidev)
+Create directory `presentazione/` with Slidev content:
 ```
 presentazione/
   slides.md
   package.json
 ```
-Esempio comandi:
+Example commands:
 ```powershell
 cd presentazione
 npm init -y
@@ -249,11 +252,11 @@ npm install @slidev/cli @slidev/theme-default
 npx slidev slides.md
 ```
 
-## Link utili
+## Useful Links
 - Homepage: https://sentry.io/
-- Docs .NET: https://docs.sentry.io/platforms/dotnet/
+- .NET Docs: https://docs.sentry.io/platforms/dotnet/
 - Performance: https://docs.sentry.io/product/performance/
 - Release Management: https://docs.sentry.io/product/releases/
 
 ---
-POC mantenuta a scopo dimostrativo. Adatta i parametri (DSN, SampleRate, Release) prima di produzione.
+POC maintained for demonstration purposes. Adjust parameters (DSN, SampleRate, Release) before going to production.
